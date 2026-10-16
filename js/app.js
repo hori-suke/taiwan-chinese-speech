@@ -75,6 +75,9 @@
     // 結果表示エリア
     resultContainer: document.getElementById('resultContainer'),
     audioPlayer: document.getElementById('audioPlayer'),
+    speedRange: document.getElementById('speedRange'),
+    speedValueText: document.getElementById('speedValueText'),
+    presetSpeedBtns: document.querySelectorAll('.c-btn--preset'),
     downloadBtn: document.getElementById('downloadBtn'),
     fileSizeText: document.getElementById('fileSizeText'),
     displayChinese: document.getElementById('displayChinese'),
@@ -85,6 +88,7 @@
   // アプリケーション状態
   let currentAudioBlob = null;
   let currentAudioUrl = null;
+  let currentPlaybackRate = 1.0;
 
   /**
    * 金額の概算計算（USDおよびJPY）
@@ -266,6 +270,55 @@
 
     // ダウンロードボタン押下
     elements.downloadBtn.addEventListener('click', handleDownload);
+
+    // 再生速度スライダー
+    if (elements.speedRange) {
+      elements.speedRange.addEventListener('input', (e) => {
+        setPlaybackRate(e.target.value);
+      });
+    }
+
+    // 再生速度プリセットボタン
+    elements.presetSpeedBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setPlaybackRate(btn.dataset.speed);
+      });
+    });
+
+    // オーディオ要素読み込み・再生開始時の再生速度維持
+    elements.audioPlayer.addEventListener('loadedmetadata', () => {
+      elements.audioPlayer.playbackRate = currentPlaybackRate;
+    });
+    elements.audioPlayer.addEventListener('play', () => {
+      elements.audioPlayer.playbackRate = currentPlaybackRate;
+    });
+  }
+
+  /**
+   * 音声の再生速度を設定（ブラウザのローカル処理・トークン消費なし）
+   */
+  function setPlaybackRate(rate) {
+    const num = Math.min(2.0, Math.max(0.5, parseFloat(rate) || 1.0));
+    currentPlaybackRate = num;
+    if (elements.audioPlayer) {
+      elements.audioPlayer.playbackRate = num;
+    }
+    if (elements.speedRange) {
+      elements.speedRange.value = num;
+    }
+    if (elements.speedValueText) {
+      elements.speedValueText.textContent = `${num.toFixed(num % 1 === 0 ? 1 : 2)}x`;
+    }
+
+    // プリセットボタンのアクティブ表示切替
+    elements.presetSpeedBtns.forEach(btn => {
+      const btnSpeed = parseFloat(btn.dataset.speed);
+      if (Math.abs(btnSpeed - num) < 0.01) {
+        btn.classList.add('c-btn--preset-active');
+      } else {
+        btn.classList.remove('c-btn--preset-active');
+      }
+    });
   }
 
   /**
@@ -360,6 +413,7 @@
       currentAudioUrl = URL.createObjectURL(taggedMp3Blob);
 
       elements.audioPlayer.src = currentAudioUrl;
+      elements.audioPlayer.playbackRate = currentPlaybackRate;
       elements.displayChinese.textContent = analysisResult.chinese;
       elements.displayPinyin.textContent = analysisResult.pinyin;
       elements.displayTranslation.textContent = analysisResult.translation;

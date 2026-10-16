@@ -183,6 +183,38 @@ body {
   }
 }
 
+.c-btn--preset {
+  background-color: #ffffff;
+  color: #334155;
+  border-color: #cbd5e1;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  @media (hover: hover) {
+    &:hover {
+      background-color: #f1f5f9;
+      border-color: #94a3b8;
+    }
+  }
+}
+
+.c-btn--preset-active {
+  background-color: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  @media (hover: hover) {
+    &:hover {
+      background-color: #059669;
+      border-color: #059669;
+    }
+  }
+}
+
 .c-btn[disabled] {
   opacity: 0.6;
   cursor: not-allowed;
@@ -420,6 +452,66 @@ body {
 .p-result__audio-player {
   width: 100%;
   height: 44px;
+}
+
+/* 再生速度コントローラー */
+.p-speed-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #ffffff;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.p-speed-control__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #166534;
+  flex-wrap: wrap;
+}
+
+.p-speed-control__label {
+  font-weight: 700;
+}
+
+.p-speed-control__val {
+  font-weight: 700;
+  color: #0284c7;
+  background-color: #e0f2fe;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.p-speed-control__note {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: auto;
+}
+
+.p-speed-control__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.p-speed-control__range {
+  flex: 1;
+  min-width: 140px;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+.p-speed-control__presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .p-result__actions {
@@ -666,9 +758,39 @@ body {
         <div class="p-section__inner">
           <div class="c-card p-result">
             
-            <!-- 音声プレーヤー＆ダウンロード -->
+            <!-- 音声プレーヤー＆速度調整＆ダウンロード -->
             <div class="p-result__audio-box">
               <audio id="audioPlayer" class="p-result__audio-player" controls preload="metadata"></audio>
+              
+              <!-- 再生速度コントローラー（ローカル完結・トークン消費ゼロ） -->
+              <div class="p-speed-control">
+                <div class="p-speed-control__header">
+                  <span class="p-speed-control__label">再生速度:</span>
+                  <span id="speedValueText" class="p-speed-control__val">1.0x</span>
+                  <span class="p-speed-control__note">※速度変更はローカル処理のためトークン消費ゼロ</span>
+                </div>
+                <div class="p-speed-control__body">
+                  <input
+                    type="range"
+                    id="speedRange"
+                    class="p-speed-control__range"
+                    min="0.5"
+                    max="2.0"
+                    step="0.05"
+                    value="1.0"
+                    title="スライダーで再生速度を微調整 (0.5x〜2.0x)"
+                  >
+                  <div class="p-speed-control__presets">
+                    <button type="button" class="c-btn c-btn--preset" data-speed="0.5">0.5x</button>
+                    <button type="button" class="c-btn c-btn--preset" data-speed="0.75">0.75x</button>
+                    <button type="button" class="c-btn c-btn--preset c-btn--preset-active" data-speed="1.0">1.0x</button>
+                    <button type="button" class="c-btn c-btn--preset" data-speed="1.25">1.25x</button>
+                    <button type="button" class="c-btn c-btn--preset" data-speed="1.5">1.5x</button>
+                    <button type="button" class="c-btn c-btn--preset" data-speed="2.0">2.0x</button>
+                  </div>
+                </div>
+              </div>
+
               <div class="p-result__actions">
                 <span id="fileSizeText" class="p-result__info-text">サイズ: 約 0 KB</span>
                 <button type="button" id="downloadBtn" class="c-btn c-btn--download">
@@ -787,6 +909,9 @@ body {
     // 結果表示エリア
     resultContainer: document.getElementById('resultContainer'),
     audioPlayer: document.getElementById('audioPlayer'),
+    speedRange: document.getElementById('speedRange'),
+    speedValueText: document.getElementById('speedValueText'),
+    presetSpeedBtns: document.querySelectorAll('.c-btn--preset'),
     downloadBtn: document.getElementById('downloadBtn'),
     fileSizeText: document.getElementById('fileSizeText'),
     displayChinese: document.getElementById('displayChinese'),
@@ -797,6 +922,7 @@ body {
   // アプリケーション状態
   let currentAudioBlob = null;
   let currentAudioUrl = null;
+  let currentPlaybackRate = 1.0;
 
   /**
    * 金額の概算計算（USDおよびJPY）
@@ -978,6 +1104,55 @@ body {
 
     // ダウンロードボタン押下
     elements.downloadBtn.addEventListener('click', handleDownload);
+
+    // 再生速度スライダー
+    if (elements.speedRange) {
+      elements.speedRange.addEventListener('input', (e) => {
+        setPlaybackRate(e.target.value);
+      });
+    }
+
+    // 再生速度プリセットボタン
+    elements.presetSpeedBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setPlaybackRate(btn.dataset.speed);
+      });
+    });
+
+    // オーディオ要素読み込み・再生開始時の再生速度維持
+    elements.audioPlayer.addEventListener('loadedmetadata', () => {
+      elements.audioPlayer.playbackRate = currentPlaybackRate;
+    });
+    elements.audioPlayer.addEventListener('play', () => {
+      elements.audioPlayer.playbackRate = currentPlaybackRate;
+    });
+  }
+
+  /**
+   * 音声の再生速度を設定（ブラウザのローカル処理・トークン消費なし）
+   */
+  function setPlaybackRate(rate) {
+    const num = Math.min(2.0, Math.max(0.5, parseFloat(rate) || 1.0));
+    currentPlaybackRate = num;
+    if (elements.audioPlayer) {
+      elements.audioPlayer.playbackRate = num;
+    }
+    if (elements.speedRange) {
+      elements.speedRange.value = num;
+    }
+    if (elements.speedValueText) {
+      elements.speedValueText.textContent = `${num.toFixed(num % 1 === 0 ? 1 : 2)}x`;
+    }
+
+    // プリセットボタンのアクティブ表示切替
+    elements.presetSpeedBtns.forEach(btn => {
+      const btnSpeed = parseFloat(btn.dataset.speed);
+      if (Math.abs(btnSpeed - num) < 0.01) {
+        btn.classList.add('c-btn--preset-active');
+      } else {
+        btn.classList.remove('c-btn--preset-active');
+      }
+    });
   }
 
   /**
@@ -1072,6 +1247,7 @@ body {
       currentAudioUrl = URL.createObjectURL(taggedMp3Blob);
 
       elements.audioPlayer.src = currentAudioUrl;
+      elements.audioPlayer.playbackRate = currentPlaybackRate;
       elements.displayChinese.textContent = analysisResult.chinese;
       elements.displayPinyin.textContent = analysisResult.pinyin;
       elements.displayTranslation.textContent = analysisResult.translation;

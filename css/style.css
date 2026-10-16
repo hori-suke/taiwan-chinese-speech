@@ -170,6 +170,38 @@ body {
   }
 }
 
+.c-btn--preset {
+  background-color: #ffffff;
+  color: #334155;
+  border-color: #cbd5e1;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  @media (hover: hover) {
+    &:hover {
+      background-color: #f1f5f9;
+      border-color: #94a3b8;
+    }
+  }
+}
+
+.c-btn--preset-active {
+  background-color: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  @media (hover: hover) {
+    &:hover {
+      background-color: #059669;
+      border-color: #059669;
+    }
+  }
+}
+
 .c-btn[disabled] {
   opacity: 0.6;
   cursor: not-allowed;
@@ -407,6 +439,66 @@ body {
 .p-result__audio-player {
   width: 100%;
   height: 44px;
+}
+
+/* 再生速度コントローラー */
+.p-speed-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #ffffff;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.p-speed-control__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #166534;
+  flex-wrap: wrap;
+}
+
+.p-speed-control__label {
+  font-weight: 700;
+}
+
+.p-speed-control__val {
+  font-weight: 700;
+  color: #0284c7;
+  background-color: #e0f2fe;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.p-speed-control__note {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: auto;
+}
+
+.p-speed-control__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.p-speed-control__range {
+  flex: 1;
+  min-width: 140px;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+.p-speed-control__presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .p-result__actions {
