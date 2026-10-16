@@ -519,7 +519,10 @@ ${text}`;
           role: 'user',
           parts: [
             {
-              text: `以下の台湾華語（繁体字）を、標準的な台湾華語の自然な発音と適切なスピードで明瞭に読み上げてください:\n\n${text}`
+              text: text.trim(),
+              speechMetadata: {
+                style: 'clear, natural Taiwanese Mandarin pronunciation, accurate tone'
+              }
             }
           ]
         }
