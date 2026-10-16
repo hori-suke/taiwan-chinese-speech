@@ -445,29 +445,53 @@
 
   /**
    * Gemini APIでテキスト解析（ピンイン・日本語訳）を取得
+   * 長文・複数行でも全行確実に取得できるようresponseSchemaを活用
    */
   async function fetchTextAnalysis(apiKey, text) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-    const prompt = `あなたは台湾華語（台湾の繁体字中国語）の専門教師です。
-以下の文章について、台湾現地で一般的に用いられる繁体字、台湾の発音に基づく声調符号付きピンイン(漢語拼音)、および自然な日本語訳を作成してください。
-必ず以下のJSONフォーマットのみを返してください。マークダウンの\`\`\`jsonブロックなどで囲まず、プレーンなJSONオブジェクトのみを出力してください。
+    const prompt = `あなたは台湾華語（台湾の繁体字中国語）の熟練した教師です。
+入力された台湾華語の文章を行（または文）ごとに分割し、各行について以下を作成してください：
+1. chinese: 台湾現地で実際に使用される自然な繁体字（入力テキストに対応）
+2. pinyin: 台湾の発音に基づいた正確な声調記号付きピンイン（漢語拼音）
+3. translation: 文脈に沿った自然でわかりやすい日本語訳
 
-{"chinese": "繁体字テキスト", "pinyin": "ピンイン（声調記号付き）", "translation": "自然な日本語訳"}
+【重要】文章が複数行・長文であっても、最初の行から最後の行まですべての行を漏らさず、必ず各行のピンインと日本語訳を最後まで出力してください。省略（...等）は禁止です。
 
 対象文章:
 ${text}`;
 
+    const requestBody = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            items: {
+              type: 'ARRAY',
+              description: '文章を行・文ごとに分割したリスト',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  chinese: { type: 'STRING', description: '台湾華語（繁体字）' },
+                  pinyin: { type: 'STRING', description: '声調記号付きピンイン（漢語拼音）' },
+                  translation: { type: 'STRING', description: '自然な日本語訳' }
+                },
+                required: ['chinese', 'pinyin', 'translation']
+              }
+            }
+          },
+          required: ['items']
+        }
+      }
+    };
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: 'application/json'
-        }
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -476,21 +500,11 @@ ${text}`;
     }
 
     const data = await response.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const usage = data.usageMetadata || {};
     const tokens = usage.totalTokenCount || 0;
 
-    let parsed = {
-      chinese: text,
-      pinyin: '',
-      translation: ''
-    };
-
-    try {
-      parsed = JSON.parse(candidateText.trim());
-    } catch {
-      parsed.translation = candidateText || '';
-    }
+    const parsed = robustParseAnalysis(candidateText, text);
 
     return {
       chinese: parsed.chinese || text,
@@ -499,6 +513,100 @@ ${text}`;
       tokens,
       usage
     };
+  }
+
+  /**
+   * JSON文字列を堅牢に解析（改行や引用符の破損・フォーマット差異に3段階で対応）
+   */
+  function robustParseAnalysis(rawText, originalInput) {
+    if (!rawText || typeof rawText !== 'string') {
+      return { chinese: originalInput, pinyin: '', translation: '' };
+    }
+
+    let cleaned = rawText.trim();
+    // マークダウンコードブロックの剥ぎ取り
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    // 1. 標準 JSON.parse
+    try {
+      const obj = JSON.parse(cleaned);
+      const res = extractAnalysisFromObj(obj, originalInput);
+      if (res.pinyin || res.translation) return res;
+    } catch {
+      // 続行
+    }
+
+    // 2. 文字列リテラル内の制御文字（未エスケープの改行など）をサニタイズして再試行
+    try {
+      // ダブルクォートで囲まれた文字列内の生改行を \n に置換
+      const sanitized = cleaned.replace(/"([^"\\]*(\\.[^"\\]*)*)"/gs, (match) => {
+        return match.replace(/\r?\n/g, '\\n');
+      });
+      const obj = JSON.parse(sanitized);
+      const res = extractAnalysisFromObj(obj, originalInput);
+      if (res.pinyin || res.translation) return res;
+    } catch {
+      // 続行
+    }
+
+    // 3. 正規表現による各フィールドの直接抽出フォールバック
+    return regexExtractAnalysis(cleaned, originalInput);
+  }
+
+  /**
+   * オブジェクト・配列から台湾華語・ピンイン・訳を抽出して改行結合
+   */
+  function extractAnalysisFromObj(data, originalInput) {
+    if (!data) return { chinese: originalInput, pinyin: '', translation: '' };
+
+    // items配列の場合
+    const list = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : null);
+    if (list && list.length > 0) {
+      const chineseLines = [];
+      const pinyinLines = [];
+      const transLines = [];
+
+      for (const item of list) {
+        if (!item) continue;
+        if (item.chinese) chineseLines.push(String(item.chinese).trim());
+        if (item.pinyin) pinyinLines.push(String(item.pinyin).trim());
+        if (item.translation) transLines.push(String(item.translation).trim());
+      }
+
+      return {
+        chinese: chineseLines.join('\n') || originalInput,
+        pinyin: pinyinLines.join('\n') || '',
+        translation: transLines.join('\n') || ''
+      };
+    }
+
+    // 単一オブジェクト形式の場合
+    return {
+      chinese: data.chinese ? String(data.chinese).trim() : originalInput,
+      pinyin: data.pinyin ? String(data.pinyin).trim() : '',
+      translation: data.translation ? String(data.translation).trim() : ''
+    };
+  }
+
+  /**
+   * 正規表現によるテキスト直接抽出フォールバック
+   */
+  function regexExtractAnalysis(text, originalInput) {
+    const extractAll = (field) => {
+      const regex = new RegExp(`"${field}"\\s*:\\s*"([\\s\\S]*?)(?="\\s*[,}\\]])`, 'g');
+      const results = [];
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        results.push(match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim());
+      }
+      return results.join('\n');
+    };
+
+    const chinese = extractAll('chinese') || originalInput;
+    const pinyin = extractAll('pinyin') || '';
+    const translation = extractAll('translation') || '';
+
+    return { chinese, pinyin, translation };
   }
 
   /**
