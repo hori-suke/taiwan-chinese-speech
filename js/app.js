@@ -16,7 +16,7 @@
 
   // デフォルト設定
   const DEFAULT_CONFIG = {
-    model: 'gemini-3.8-flash',
+    model: 'gemini-3.8-flash-tts',
     voice: 'Aoede', // 女性: Aoede, 男性: Puck
   };
 
@@ -70,9 +70,9 @@
     elements.apiKeyInput.value = savedKey;
 
     let savedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || DEFAULT_CONFIG.model;
-    // 廃止された旧モデルが残っていた場合は最新のgemini-3.8-flashに更新
-    if (savedModel === 'gemini-2.0-flash') {
-      savedModel = 'gemini-3.8-flash';
+    // 廃止された旧モデルや非TTSモデル名が保存されていた場合は最新のgemini-3.8-flash-ttsに更新
+    if (savedModel === 'gemini-2.0-flash' || savedModel === 'gemini-3.8-flash' || savedModel === 'gemini-2.5-flash-preview-tts') {
+      savedModel = 'gemini-3.8-flash-tts';
       localStorage.setItem(STORAGE_KEYS.MODEL, savedModel);
     }
     const modelOptions = Array.from(elements.modelSelect.options).map(o => o.value);
@@ -190,7 +190,8 @@
    */
   function getSelectedModel() {
     if (elements.modelSelect.value === 'custom') {
-      return elements.customModelInput.value.trim() || 'gemini-2.5-flash-preview-tts';
+      const custom = elements.customModelInput.value.trim();
+      return custom || 'gemini-3.8-flash-tts';
     }
     return elements.modelSelect.value;
   }
@@ -364,7 +365,13 @@ ${text}`;
    * Gemini APIのAudioモダリティ(TTS)で音声バイナリを取得
    */
   async function fetchTtsAudio(apiKey, model, voiceName, text) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // モデル名が通常のgemini-3.8-flash等の場合はTTSモデル名に正規化
+    let ttsModel = model;
+    if (ttsModel === 'gemini-3.8-flash') {
+      ttsModel = 'gemini-3.8-flash-tts';
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${ttsModel}:generateContent?key=${apiKey}`;
 
     const requestBody = {
       contents: [
@@ -401,14 +408,17 @@ ${text}`;
     }
 
     const data = await response.json();
-    const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const audioPart = parts.find(p => p.inlineData && p.inlineData.data);
 
-    if (!inlineData || !inlineData.data) {
-      throw new Error('APIから音声データが返されませんでした。モデルがTTS出力に対応しているか確認してください。');
+    if (!audioPart) {
+      const textPart = parts.find(p => p.text);
+      const detail = textPart ? ` (モデル返却テキスト: ${textPart.text.slice(0, 100)})` : '';
+      throw new Error(`APIから音声データが返されませんでした。(モデル: ${ttsModel})${detail}。TTS対応モデル(gemini-3.8-flash-tts)が有効かご確認ください。`);
     }
 
-    const base64Audio = inlineData.data;
-    const mimeType = inlineData.mimeType || 'audio/wav';
+    const base64Audio = audioPart.inlineData.data;
+    const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
     const binaryString = atob(base64Audio);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
