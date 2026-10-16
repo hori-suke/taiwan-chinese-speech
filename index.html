@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台湾華語 リスニング＆スピーキング学習</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- 軽量MP3エンコーダ & ID3タグ書き込みライブラリ -->
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/browser-id3-writer@4.4.0/dist/browser-id3-writer.min.js"></script>
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header class="l-header">
+    <div class="l-header__inner">
+      <div class="c-logo">
+        <span>🇹🇼 台湾華語 音声学習</span>
+        <span class="c-logo__badge">Gemini TTS</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="l-main">
+    <div class="l-main__inner">
+      
+      <!-- 設定セクション -->
+      <section class="p-section">
+        <div class="p-section__inner">
+          <div class="c-card p-settings">
+            
+            <!-- APIキー入力 -->
+            <div class="p-settings__field">
+              <label class="p-settings__label" for="apiKeyInput">
+                <span>Gemini APIキー</span>
+                <span class="p-settings__hint">※端末内にのみ保存され、外部サーバへ送信されません</span>
+              </label>
+              <div style="display: flex; gap: 8px;">
+                <input
+                  type="password"
+                  id="apiKeyInput"
+                  class="c-input"
+                  placeholder="AIzaSy...（Google AI Studioで取得したAPIキー）"
+                  autocomplete="off"
+                >
+                <button type="button" id="toggleApiKeyBtn" class="c-btn c-btn--secondary" style="white-space: nowrap;">表示</button>
+              </div>
+            </div>
+
+            <!-- モデル＆音声選択 -->
+            <div class="p-settings__row">
+              <div class="p-settings__field">
+                <label class="p-settings__label" for="modelSelect">使用モデル</label>
+                <select id="modelSelect" class="c-select">
+                  <option value="gemini-2.5-flash-preview-tts" selected>Gemini 2.5 Flash TTS (推奨・高速)</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (指定モデル)</option>
+                  <option value="custom">手動でモデル名を入力...</option>
+                </select>
+                <input
+                  type="text"
+                  id="customModelInput"
+                  class="c-input u-hidden"
+                  placeholder="モデル名を入力 (例: gemini-3.8-flash-preview)"
+                  style="margin-top: 6px;"
+                >
+              </div>
+
+              <div class="p-settings__field">
+                <label class="p-settings__label" for="voiceSelect">話者の声（男女）</label>
+                <select id="voiceSelect" class="c-select">
+                  <option value="Aoede" selected>女性 1 (Aoede - 明るく自然)</option>
+                  <option value="Kore">女性 2 (Kore - 落ち着いた声)</option>
+                  <option value="Puck">男性 1 (Puck - はきはきした声)</option>
+                  <option value="Fenrir">男性 2 (Fenrir - 深みのある声)</option>
+                  <option value="Charon">男性 3 (Charon - 安定感のある声)</option>
+                </select>
+              </div>
+
+              <div class="p-settings__field" style="justify-content: flex-end;">
+                <label class="p-settings__label">音声形式</label>
+                <div style="padding: 10px 0; font-size: 13px; color: #475569; font-weight: 600;">
+                  軽量 MP3 (64kbps / 歌詞埋込)
+                </div>
+              </div>
+            </div>
+
+            <!-- API残クレジット・使用量モニター -->
+            <div class="p-quota-card">
+              <div class="p-quota-card__stats">
+                <div class="p-quota-card__item">
+                  <span>直近消費:</span>
+                  <span id="statCurrentTokens" class="p-quota-card__value">0</span>
+                  <span>tokens</span>
+                </div>
+                <div class="p-quota-card__item">
+                  <span>累計消費:</span>
+                  <span id="statTotalTokens" class="p-quota-card__value">0</span>
+                  <span>tokens</span>
+                </div>
+                <div class="p-quota-card__item">
+                  <span>リクエスト回数:</span>
+                  <span id="statTotalCalls" class="p-quota-card__value">0</span>
+                  <span>回</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; margin-left: auto;">
+                <button type="button" id="resetStatsBtn" class="c-btn c-btn--clear" title="統計カウントをリセット">リセット</button>
+                <a
+                  href="https://aistudio.google.com/app/plan_information"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="p-quota-card__link"
+                >
+                  AI Studio残クレジット確認 ↗
+                </a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- テキスト入力セクション -->
+      <section class="p-section">
+        <div class="p-section__inner">
+          <div class="c-card p-editor">
+            <div class="p-editor__header">
+              <span class="p-editor__title">台湾華語の文章</span>
+              <div class="p-editor__actions">
+                <button type="button" id="clearTextBtn" class="c-btn c-btn--clear">テキストをクリア</button>
+              </div>
+            </div>
+
+            <textarea
+              id="chineseTextInput"
+              class="c-textarea"
+              placeholder="ここに台湾華語（繁体字）の文章を入力または貼り付けてください。&#10;例: 請問這附近有推薦的台灣小吃店嗎？我想吃小籠包和牛肉麵。"
+            ></textarea>
+
+            <div class="p-submit-area">
+              <div class="p-status-text">
+                <span id="statusSpinner" class="u-spinner u-hidden"></span>
+                <span id="statusText">準備完了</span>
+              </div>
+              <button type="button" id="generateBtn" class="c-btn c-btn--primary">
+                音声と解析を生成
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 結果・再生セクション -->
+      <section id="resultContainer" class="p-section u-hidden">
+        <div class="p-section__inner">
+          <div class="c-card p-result">
+            
+            <!-- 音声プレーヤー＆ダウンロード -->
+            <div class="p-result__audio-box">
+              <audio id="audioPlayer" class="p-result__audio-player" controls preload="metadata"></audio>
+              <div class="p-result__actions">
+                <span id="fileSizeText" class="p-result__info-text">サイズ: 約 0 KB</span>
+                <button type="button" id="downloadBtn" class="c-btn c-btn--download">
+                  軽量MP3をダウンロード（歌詞情報埋込済）
+                </button>
+              </div>
+            </div>
+
+            <!-- 学習用テキストカード（台湾華語・ピンイン・日本語訳） -->
+            <div class="p-lyrics-card">
+              <div class="p-lyrics-card__group">
+                <span class="p-lyrics-card__heading">台湾華語 (繁体字)</span>
+                <p id="displayChinese" class="p-lyrics-card__content p-lyrics-card__content--chinese"></p>
+              </div>
+
+              <div class="p-lyrics-card__group">
+                <span class="p-lyrics-card__heading">拼音 (Pinyin / 漢語拼音)</span>
+                <p id="displayPinyin" class="p-lyrics-card__content p-lyrics-card__content--pinyin"></p>
+              </div>
+
+              <div class="p-lyrics-card__group">
+                <span class="p-lyrics-card__heading">日本語訳</span>
+                <p id="displayTranslation" class="p-lyrics-card__content p-lyrics-card__content--translation"></p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- フッター -->
+  <footer class="l-footer">
+    <div class="l-footer__inner">
+      <p>台湾華語 リスニング＆スピーキング学習 Webアプリ（ブラウザ内完全処理）</p>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
