@@ -20,6 +20,37 @@
     voice: 'Aoede', // 女性: Aoede, 男性: Puck
   };
 
+  // 為替レート（概算: 1 USD = 155 JPY）
+  const USD_JPY_RATE = 155;
+
+  // 100万トークンあたりの公式標準料金（USD）
+  const PRICING = {
+    // テキスト解析用 (gemini-3.8-flash)
+    text: {
+      promptPerM: 0.75,     // $0.75 / 100万入力トークン
+      candidatePerM: 3.75   // $3.75 / 100万出力トークン
+    },
+    // 音声TTS用モデル
+    tts: {
+      'gemini-3.8-flash-tts': {
+        promptPerM: 0.75,     // $0.75 / 100万入力トークン
+        audioPerM: 9.00       // $9.00 / 100万音声トークン
+      },
+      'gemini-3.8-flash-lite-tts': {
+        promptPerM: 0.375,    // $0.375 / 100万入力トークン
+        audioPerM: 4.50       // $4.50 / 100万音声トークン
+      },
+      'gemini-2.5-flash-preview-tts': {
+        promptPerM: 0.75,     // $0.75 / 100万入力トークン
+        audioPerM: 10.00      // $10.00 / 100万音声トークン
+      },
+      default: {
+        promptPerM: 0.75,
+        audioPerM: 9.00
+      }
+    }
+  };
+
   // DOM要素の参照
   const elements = {
     apiKeyInput: document.getElementById('apiKeyInput'),
@@ -35,7 +66,9 @@
     
     // 使用状況表示
     statCurrentTokens: document.getElementById('statCurrentTokens'),
+    statCurrentCost: document.getElementById('statCurrentCost'),
     statTotalTokens: document.getElementById('statTotalTokens'),
+    statTotalCost: document.getElementById('statTotalCost'),
     statTotalCalls: document.getElementById('statTotalCalls'),
     resetStatsBtn: document.getElementById('resetStatsBtn'),
 
@@ -52,6 +85,40 @@
   // アプリケーション状態
   let currentAudioBlob = null;
   let currentAudioUrl = null;
+
+  /**
+   * 金額の概算計算（USDおよびJPY）
+   */
+  function calculateCost(analysisUsage = {}, ttsUsage = {}, ttsModel = 'gemini-3.8-flash-tts') {
+    const textRates = PRICING.text;
+    const ttsRates = PRICING.tts[ttsModel] || PRICING.tts.default;
+
+    const textPromptTokens = analysisUsage.promptTokenCount || 0;
+    const textCandidateTokens = analysisUsage.candidatesTokenCount || 0;
+    const ttsPromptTokens = ttsUsage.promptTokenCount || 0;
+    const ttsAudioTokens = ttsUsage.candidatesTokenCount || 0;
+
+    const textCostUsd = (textPromptTokens * textRates.promptPerM + textCandidateTokens * textRates.candidatePerM) / 1000000;
+    const ttsCostUsd = (ttsPromptTokens * ttsRates.promptPerM + ttsAudioTokens * ttsRates.audioPerM) / 1000000;
+
+    const totalUsd = textCostUsd + ttsCostUsd;
+    const totalJpy = totalUsd * USD_JPY_RATE;
+
+    return { totalUsd, totalJpy };
+  }
+
+  /**
+   * 金額を読みやすくフォーマット
+   */
+  function formatCost(jpy, usd) {
+    if (!jpy || jpy === 0) {
+      return '約¥0.00';
+    }
+    if (jpy < 0.01) {
+      return `約¥${jpy.toFixed(3)} ($${usd.toFixed(4)})`;
+    }
+    return `約¥${jpy.toFixed(2)} ($${usd.toFixed(4)})`;
+  }
 
   /**
    * 初期化処理
@@ -90,33 +157,48 @@
   }
 
   /**
-   * 使用状況（トークン統計）を復元
+   * 使用状況（トークン統計・累積金額）を復元
    */
   function loadStats() {
     try {
       const statsJson = localStorage.getItem(STORAGE_KEYS.STATS);
-      const stats = statsJson ? JSON.parse(statsJson) : { totalTokens: 0, totalCalls: 0 };
-      elements.statTotalTokens.textContent = Number(stats.totalTokens).toLocaleString();
-      elements.statTotalCalls.textContent = Number(stats.totalCalls).toLocaleString();
+      const stats = statsJson ? JSON.parse(statsJson) : { totalTokens: 0, totalCalls: 0, totalUsd: 0, totalJpy: 0 };
+      elements.statTotalTokens.textContent = Number(stats.totalTokens || 0).toLocaleString();
+      elements.statTotalCalls.textContent = Number(stats.totalCalls || 0).toLocaleString();
+      if (elements.statTotalCost) {
+        elements.statTotalCost.textContent = formatCost(stats.totalJpy || 0, stats.totalUsd || 0);
+      }
     } catch {
       elements.statTotalTokens.textContent = '0';
       elements.statTotalCalls.textContent = '0';
+      if (elements.statTotalCost) {
+        elements.statTotalCost.textContent = '約¥0.00';
+      }
     }
   }
 
   /**
-   * 使用状況の加算保存
+   * 使用状況の加算保存（トークン数と金額）
    */
-  function recordUsage(tokenCount) {
+  function recordUsage(tokenCount, costObj) {
     try {
       const statsJson = localStorage.getItem(STORAGE_KEYS.STATS);
-      const stats = statsJson ? JSON.parse(statsJson) : { totalTokens: 0, totalCalls: 0 };
-      stats.totalTokens += tokenCount;
-      stats.totalCalls += 1;
+      const stats = statsJson ? JSON.parse(statsJson) : { totalTokens: 0, totalCalls: 0, totalUsd: 0, totalJpy: 0 };
+      stats.totalTokens = (stats.totalTokens || 0) + tokenCount;
+      stats.totalCalls = (stats.totalCalls || 0) + 1;
+      stats.totalUsd = (stats.totalUsd || 0) + (costObj.totalUsd || 0);
+      stats.totalJpy = (stats.totalJpy || 0) + (costObj.totalJpy || 0);
+
       localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
 
       elements.statCurrentTokens.textContent = Number(tokenCount).toLocaleString();
+      if (elements.statCurrentCost) {
+        elements.statCurrentCost.textContent = formatCost(costObj.totalJpy, costObj.totalUsd);
+      }
       elements.statTotalTokens.textContent = Number(stats.totalTokens).toLocaleString();
+      if (elements.statTotalCost) {
+        elements.statTotalCost.textContent = formatCost(stats.totalJpy, stats.totalUsd);
+      }
       elements.statTotalCalls.textContent = Number(stats.totalCalls).toLocaleString();
     } catch (e) {
       console.warn('使用統計の更新に失敗しました:', e);
@@ -170,9 +252,10 @@
     // 統計リセットボタン
     if (elements.resetStatsBtn) {
       elements.resetStatsBtn.addEventListener('click', () => {
-        if (confirm('トークン統計カウントをリセットしますか？')) {
+        if (confirm('トークン統計および金額カウントをリセットしますか？')) {
           localStorage.removeItem(STORAGE_KEYS.STATS);
           elements.statCurrentTokens.textContent = '0';
+          if (elements.statCurrentCost) elements.statCurrentCost.textContent = '約¥0.00';
           loadStats();
         }
       });
@@ -287,9 +370,10 @@
 
       elements.resultContainer.classList.remove('u-hidden');
 
-      // トークン使用量を合算して記録
+      // トークン使用量と概算金額を合算して記録
       const totalTokens = (analysisResult.tokens || 0) + (ttsResult.tokens || 0);
-      recordUsage(totalTokens);
+      const costObj = calculateCost(analysisResult.usage, ttsResult.usage, ttsResult.ttsModel);
+      recordUsage(totalTokens, costObj);
 
       setStatus('生成が完了しました！');
     } catch (err) {
@@ -339,7 +423,8 @@ ${text}`;
 
     const data = await response.json();
     const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const tokens = data.usageMetadata?.totalTokenCount || 0;
+    const usage = data.usageMetadata || {};
+    const tokens = usage.totalTokenCount || 0;
 
     let parsed = {
       chinese: text,
@@ -357,7 +442,8 @@ ${text}`;
       chinese: parsed.chinese || text,
       pinyin: parsed.pinyin || '',
       translation: parsed.translation || '',
-      tokens
+      tokens,
+      usage
     };
   }
 
@@ -425,12 +511,15 @@ ${text}`;
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const tokens = data.usageMetadata?.totalTokenCount || 0;
+    const usage = data.usageMetadata || {};
+    const tokens = usage.totalTokenCount || 0;
 
     return {
       audioBuffer: bytes.buffer,
       mimeType,
-      tokens
+      tokens,
+      usage,
+      ttsModel
     };
   }
 

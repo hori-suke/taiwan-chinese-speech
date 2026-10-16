@@ -322,10 +322,28 @@ body {
   color: #0284c7;
 }
 
+.p-quota-card__cost {
+  font-weight: 600;
+  font-size: 11px;
+  color: #059669;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
 .p-quota-card__link {
   color: #0284c7;
   text-decoration: underline;
   margin-left: auto;
+}
+
+.p-quota-card__note {
+  width: 100%;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 6px;
 }
 
 /* 入力エリア */
