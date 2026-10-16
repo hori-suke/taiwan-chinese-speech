@@ -533,16 +533,15 @@ body {
               <div class="p-settings__field">
                 <label class="p-settings__label" for="modelSelect">使用モデル</label>
                 <select id="modelSelect" class="c-select">
-                  <option value="gemini-2.5-flash-preview-tts" selected>Gemini 2.5 Flash TTS (推奨・高速)</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (指定モデル)</option>
+                  <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash (最新・推奨)</option>
+                  <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS</option>
                   <option value="custom">手動でモデル名を入力...</option>
                 </select>
                 <input
                   type="text"
                   id="customModelInput"
                   class="c-input u-hidden"
-                  placeholder="モデル名を入力 (例: gemini-3.8-flash-preview)"
+                  placeholder="モデル名を入力 (例: gemini-3.8-flash)"
                   style="margin-top: 6px;"
                 >
               </div>
@@ -588,7 +587,7 @@ body {
               <div style="display: flex; align-items: center; gap: 12px; margin-left: auto;">
                 <button type="button" id="resetStatsBtn" class="c-btn c-btn--clear" title="統計カウントをリセット">リセット</button>
                 <a
-                  href="https://aistudio.google.com/app/plan_information"
+                  href="https://aistudio.google.com/api-keys?hl=ja"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="p-quota-card__link"
@@ -699,8 +698,7 @@ body {
 
   // デフォルト設定
   const DEFAULT_CONFIG = {
-    // ユーザー指定の3.8 flash ttsを含め、TTS対応モデルを初期設定
-    model: 'gemini-2.5-flash-preview-tts',
+    model: 'gemini-3.8-flash',
     voice: 'Aoede', // 女性: Aoede, 男性: Puck
   };
 
@@ -753,7 +751,12 @@ body {
     const savedKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
     elements.apiKeyInput.value = savedKey;
 
-    const savedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || DEFAULT_CONFIG.model;
+    let savedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || DEFAULT_CONFIG.model;
+    // 廃止された旧モデルが残っていた場合は最新のgemini-3.8-flashに更新
+    if (savedModel === 'gemini-2.0-flash') {
+      savedModel = 'gemini-3.8-flash';
+      localStorage.setItem(STORAGE_KEYS.MODEL, savedModel);
+    }
     const modelOptions = Array.from(elements.modelSelect.options).map(o => o.value);
     if (modelOptions.includes(savedModel)) {
       elements.modelSelect.value = savedModel;
@@ -987,7 +990,7 @@ body {
    * Gemini APIでテキスト解析（ピンイン・日本語訳）を取得
    */
   async function fetchTextAnalysis(apiKey, text) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
     const prompt = `あなたは台湾華語（台湾の繁体字中国語）の専門教師です。
 以下の文章について、台湾現地で一般的に用いられる繁体字、台湾の発音に基づく声調符号付きピンイン(漢語拼音)、および自然な日本語訳を作成してください。

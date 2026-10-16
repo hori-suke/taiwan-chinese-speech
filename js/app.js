@@ -16,8 +16,7 @@
 
   // デフォルト設定
   const DEFAULT_CONFIG = {
-    // ユーザー指定の3.8 flash ttsを含め、TTS対応モデルを初期設定
-    model: 'gemini-2.5-flash-preview-tts',
+    model: 'gemini-3.8-flash',
     voice: 'Aoede', // 女性: Aoede, 男性: Puck
   };
 
@@ -70,7 +69,12 @@
     const savedKey = localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
     elements.apiKeyInput.value = savedKey;
 
-    const savedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || DEFAULT_CONFIG.model;
+    let savedModel = localStorage.getItem(STORAGE_KEYS.MODEL) || DEFAULT_CONFIG.model;
+    // 廃止された旧モデルが残っていた場合は最新のgemini-3.8-flashに更新
+    if (savedModel === 'gemini-2.0-flash') {
+      savedModel = 'gemini-3.8-flash';
+      localStorage.setItem(STORAGE_KEYS.MODEL, savedModel);
+    }
     const modelOptions = Array.from(elements.modelSelect.options).map(o => o.value);
     if (modelOptions.includes(savedModel)) {
       elements.modelSelect.value = savedModel;
@@ -304,7 +308,7 @@
    * Gemini APIでテキスト解析（ピンイン・日本語訳）を取得
    */
   async function fetchTextAnalysis(apiKey, text) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
     const prompt = `あなたは台湾華語（台湾の繁体字中国語）の専門教師です。
 以下の文章について、台湾現地で一般的に用いられる繁体字、台湾の発音に基づく声調符号付きピンイン(漢語拼音)、および自然な日本語訳を作成してください。

@@ -10,7 +10,7 @@
 1. **台湾華語の高品質な音声生成 (Gemini TTS)**
    - Google Gemini APIの音声合成（Audio出力モダリティ）を活用。
    - 女性音声（`Aoede`, `Kore`）、男性音声（`Puck`, `Fenrir`, `Charon`）から選択可能。
-   - `gemini-2.5-flash-preview-tts`、`gemini-2.0-flash`、`gemini-3.8-flash` など任意のモデルを指定可能。
+   - `gemini-3.8-flash`（推奨・最新）、`gemini-2.5-flash-preview-tts` など任意のモデルを指定可能。
 
 2. **軽量MP3生成＆歌詞タグ（ID3v2 USLT）埋め込み**
    - Web Audio APIとブラウザ内MP3エンコーダにより、約数十KB〜数百KBの超軽量MP3ファイルを生成。
