@@ -80,9 +80,7 @@
     presetSpeedBtns: document.querySelectorAll('.c-btn--preset'),
     downloadBtn: document.getElementById('downloadBtn'),
     fileSizeText: document.getElementById('fileSizeText'),
-    displayChinese: document.getElementById('displayChinese'),
-    displayPinyin: document.getElementById('displayPinyin'),
-    displayTranslation: document.getElementById('displayTranslation')
+    sentenceList: document.getElementById('sentenceList')
   };
 
   // アプリケーション状態
@@ -385,19 +383,13 @@
       // lamejs で軽量MP3（64kbps モノラル）にエンコード
       const mp3ArrayBuffer = await encodeToMp3(audioBuffer, 64);
 
-      setStatus('歌詞情報（ピンイン・訳）を埋め込み中...', true);
+      setStatus('歌詞情報（ピンイン・訳・解説）を埋め込み中...', true);
 
       // ID3v2タグ（USLT歌詞フレーム）の埋め込み
-      const lyricsText = [
-        '【台湾華語】',
-        analysisResult.chinese,
-        '',
-        '【拼音】',
-        analysisResult.pinyin,
-        '',
-        '【日本語訳】',
-        analysisResult.translation
-      ].join('\n');
+      // 一文ずつ「原文 / ピンイン / 日本語訳（解説付）」のセットを空行区切りで生成
+      const lyricsText = (analysisResult.items && analysisResult.items.length > 0)
+        ? analysisResult.items.map(item => `${item.chinese}\n${item.pinyin}\n${item.translation}`).join('\n\n')
+        : `${analysisResult.chinese}\n${analysisResult.pinyin}\n${analysisResult.translation}`;
 
       const taggedMp3Blob = embedId3Lyrics(mp3ArrayBuffer, {
         title: analysisResult.chinese.slice(0, 30),
@@ -414,9 +406,9 @@
 
       elements.audioPlayer.src = currentAudioUrl;
       elements.audioPlayer.playbackRate = currentPlaybackRate;
-      elements.displayChinese.textContent = analysisResult.chinese;
-      elements.displayPinyin.textContent = analysisResult.pinyin;
-      elements.displayTranslation.textContent = analysisResult.translation;
+
+      // 一文単位の学習カードを画面に描画
+      renderSentenceCards(analysisResult.items, analysisResult);
 
       // ファイルサイズ表示（KB単位）
       const sizeKb = (taggedMp3Blob.size / 1024).toFixed(1);
@@ -450,13 +442,17 @@
   async function fetchTextAnalysis(apiKey, text) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-    const prompt = `あなたは台湾華語（台湾の繁体字中国語）の熟練した教師です。
-入力された台湾華語の文章を行（または文）ごとに分割し、各行について以下を作成してください：
-1. chinese: 台湾現地で実際に使用される自然な繁体字（入力テキストに対応）
-2. pinyin: 台湾の発音に基づいた正確な声調記号付きピンイン（漢語拼音）
-3. translation: 文脈に沿った自然でわかりやすい日本語訳
+    const prompt = `あなたは台湾華語（台湾の繁体字中国語）の教育専門家です。
+入力された文章を一文ずつ（句点「。」「！」「？」や改行を目安に文単位で）分割し、各文について以下の3項目を作成してください：
 
-【重要】文章が複数行・長文であっても、最初の行から最後の行まですべての行を漏らさず、必ず各行のピンインと日本語訳を最後まで出力してください。省略（...等）は禁止です。
+1. chinese: 台湾現地で実際に使用される自然な繁体字（入力テキストに対応）
+2. pinyin: 台湾の発音に基づく正確な声調記号付きピンイン（漢語拼音）
+3. translation: 自然な日本語訳。
+   【重要・語学解説ルール】:
+   TOCFL BAND A（入門・基礎レベル: A1/A2、約1000語レベル）を超える、BAND B（進階・高階: B1/B2）やBAND Cレベルの難易度の高い単語、成語、台湾特有の語彙・口語表現、または初級では習わない文法表現が含まれる場合は、日本語訳の末尾に（※「単語/文法」: 解説）の形で分かりやすく注釈を追加してください。
+   BAND Aの基礎的な表現のみで構成されている文は解説不要（自然な日本語訳のみ）です。
+
+【重要】文章が複数行・長文であっても、最初の一文から最後の一文まですべて漏らさず、必ず全行のピンインと日本語訳（解説付）を最後まで出力してください。省略（...等）は禁止です。
 
 対象文章:
 ${text}`;
@@ -471,13 +467,13 @@ ${text}`;
           properties: {
             items: {
               type: 'ARRAY',
-              description: '文章を行・文ごとに分割したリスト',
+              description: '文章を一文ごとに分割したリスト',
               items: {
                 type: 'OBJECT',
                 properties: {
                   chinese: { type: 'STRING', description: '台湾華語（繁体字）' },
                   pinyin: { type: 'STRING', description: '声調記号付きピンイン（漢語拼音）' },
-                  translation: { type: 'STRING', description: '自然な日本語訳' }
+                  translation: { type: 'STRING', description: '自然な日本語訳（必要に応じTOCFL解説付）' }
                 },
                 required: ['chinese', 'pinyin', 'translation']
               }
@@ -510,6 +506,7 @@ ${text}`;
       chinese: parsed.chinese || text,
       pinyin: parsed.pinyin || '',
       translation: parsed.translation || '',
+      items: parsed.items || [],
       tokens,
       usage
     };
@@ -520,7 +517,7 @@ ${text}`;
    */
   function robustParseAnalysis(rawText, originalInput) {
     if (!rawText || typeof rawText !== 'string') {
-      return { chinese: originalInput, pinyin: '', translation: '' };
+      return { chinese: originalInput, pinyin: '', translation: '', items: [] };
     }
 
     let cleaned = rawText.trim();
@@ -531,20 +528,19 @@ ${text}`;
     try {
       const obj = JSON.parse(cleaned);
       const res = extractAnalysisFromObj(obj, originalInput);
-      if (res.pinyin || res.translation) return res;
+      if (res.items && res.items.length > 0) return res;
     } catch {
       // 続行
     }
 
     // 2. 文字列リテラル内の制御文字（未エスケープの改行など）をサニタイズして再試行
     try {
-      // ダブルクォートで囲まれた文字列内の生改行を \n に置換
       const sanitized = cleaned.replace(/"([^"\\]*(\\.[^"\\]*)*)"/gs, (match) => {
         return match.replace(/\r?\n/g, '\\n');
       });
       const obj = JSON.parse(sanitized);
       const res = extractAnalysisFromObj(obj, originalInput);
-      if (res.pinyin || res.translation) return res;
+      if (res.items && res.items.length > 0) return res;
     } catch {
       // 続行
     }
@@ -554,37 +550,49 @@ ${text}`;
   }
 
   /**
-   * オブジェクト・配列から台湾華語・ピンイン・訳を抽出して改行結合
+   * オブジェクト・配列から台湾華語・ピンイン・訳・itemsを抽出
    */
   function extractAnalysisFromObj(data, originalInput) {
-    if (!data) return { chinese: originalInput, pinyin: '', translation: '' };
+    if (!data) return { chinese: originalInput, pinyin: '', translation: '', items: [] };
 
     // items配列の場合
     const list = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : null);
     if (list && list.length > 0) {
+      const items = [];
       const chineseLines = [];
       const pinyinLines = [];
       const transLines = [];
 
       for (const item of list) {
         if (!item) continue;
-        if (item.chinese) chineseLines.push(String(item.chinese).trim());
-        if (item.pinyin) pinyinLines.push(String(item.pinyin).trim());
-        if (item.translation) transLines.push(String(item.translation).trim());
+        const ch = item.chinese ? String(item.chinese).trim() : '';
+        const pi = item.pinyin ? String(item.pinyin).trim() : '';
+        const tr = item.translation ? String(item.translation).trim() : '';
+        if (ch || pi || tr) {
+          items.push({ chinese: ch, pinyin: pi, translation: tr });
+          if (ch) chineseLines.push(ch);
+          if (pi) pinyinLines.push(pi);
+          if (tr) transLines.push(tr);
+        }
       }
 
       return {
         chinese: chineseLines.join('\n') || originalInput,
         pinyin: pinyinLines.join('\n') || '',
-        translation: transLines.join('\n') || ''
+        translation: transLines.join('\n') || '',
+        items: items.length > 0 ? items : [{ chinese: originalInput, pinyin: pinyinLines.join('\n'), translation: transLines.join('\n') }]
       };
     }
 
     // 単一オブジェクト形式の場合
+    const ch = data.chinese ? String(data.chinese).trim() : originalInput;
+    const pi = data.pinyin ? String(data.pinyin).trim() : '';
+    const tr = data.translation ? String(data.translation).trim() : '';
     return {
-      chinese: data.chinese ? String(data.chinese).trim() : originalInput,
-      pinyin: data.pinyin ? String(data.pinyin).trim() : '',
-      translation: data.translation ? String(data.translation).trim() : ''
+      chinese: ch,
+      pinyin: pi,
+      translation: tr,
+      items: [{ chinese: ch, pinyin: pi, translation: tr }]
     };
   }
 
@@ -599,14 +607,67 @@ ${text}`;
       while ((match = regex.exec(text)) !== null) {
         results.push(match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim());
       }
-      return results.join('\n');
+      return results;
     };
 
-    const chinese = extractAll('chinese') || originalInput;
-    const pinyin = extractAll('pinyin') || '';
-    const translation = extractAll('translation') || '';
+    const chineseList = extractAll('chinese');
+    const pinyinList = extractAll('pinyin');
+    const translationList = extractAll('translation');
 
-    return { chinese, pinyin, translation };
+    const maxLen = Math.max(chineseList.length, pinyinList.length, translationList.length);
+    const items = [];
+    for (let i = 0; i < maxLen; i++) {
+      items.push({
+        chinese: chineseList[i] || '',
+        pinyin: pinyinList[i] || '',
+        translation: translationList[i] || ''
+      });
+    }
+
+    return {
+      chinese: chineseList.join('\n') || originalInput,
+      pinyin: pinyinList.join('\n') || '',
+      translation: translationList.join('\n') || '',
+      items: items.length > 0 ? items : [{ chinese: originalInput, pinyin: '', translation: '' }]
+    };
+  }
+
+  /**
+   * 一文単位の学習カードを画面に描画
+   */
+  function renderSentenceCards(items, fallback) {
+    if (!elements.sentenceList) return;
+    elements.sentenceList.innerHTML = '';
+
+    const list = (items && items.length > 0) ? items : [
+      {
+        chinese: fallback.chinese || '',
+        pinyin: fallback.pinyin || '',
+        translation: fallback.translation || ''
+      }
+    ];
+
+    list.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'p-sentence-card';
+
+      const chEl = document.createElement('div');
+      chEl.className = 'p-sentence-card__chinese';
+      chEl.textContent = item.chinese || '';
+
+      const piEl = document.createElement('div');
+      piEl.className = 'p-sentence-card__pinyin';
+      piEl.textContent = item.pinyin || '';
+
+      const trEl = document.createElement('div');
+      trEl.className = 'p-sentence-card__translation';
+      trEl.textContent = item.translation || '';
+
+      card.appendChild(chEl);
+      card.appendChild(piEl);
+      card.appendChild(trEl);
+      elements.sentenceList.appendChild(card);
+    });
   }
 
   /**

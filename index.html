@@ -24,7 +24,7 @@
         <span class="c-logo__badge">Gemini TTS</span>
       </div>
       <div class="c-version">
-        <span class="c-version__text">Ver: 2026.10.16 17:20</span>
+        <span class="c-version__text">Ver: 2026.10.18 14:15</span>
       </div>
     </div>
   </header>
@@ -211,23 +211,8 @@
               </div>
             </div>
 
-            <!-- 学習用テキストカード（台湾華語・ピンイン・日本語訳） -->
-            <div class="p-lyrics-card">
-              <div class="p-lyrics-card__group">
-                <span class="p-lyrics-card__heading">台湾華語 (繁体字)</span>
-                <p id="displayChinese" class="p-lyrics-card__content p-lyrics-card__content--chinese"></p>
-              </div>
-
-              <div class="p-lyrics-card__group">
-                <span class="p-lyrics-card__heading">拼音 (Pinyin / 漢語拼音)</span>
-                <p id="displayPinyin" class="p-lyrics-card__content p-lyrics-card__content--pinyin"></p>
-              </div>
-
-              <div class="p-lyrics-card__group">
-                <span class="p-lyrics-card__heading">日本語訳</span>
-                <p id="displayTranslation" class="p-lyrics-card__content p-lyrics-card__content--translation"></p>
-              </div>
-            </div>
+            <!-- 学習用テキストカード（一文ずつ：原文・ピンイン・日本語訳解説） -->
+            <div id="sentenceList" class="p-sentence-list"></div>
 
           </div>
         </div>
@@ -240,7 +225,7 @@
   <footer class="l-footer">
     <div class="l-footer__inner">
       <p>台湾華語 リスニング＆スピーキング学習 Webアプリ（ブラウザ内完全処理）</p>
-      <p style="font-size: 11px; margin-top: 4px; color: #94a3b8;">バージョン: 2026.10.16 17:20 更新版</p>
+      <p style="font-size: 11px; margin-top: 4px; color: #94a3b8;">バージョン: 2026.10.18 14:15 更新版</p>
     </div>
   </footer>
 
