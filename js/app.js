@@ -76,6 +76,8 @@
     resultContainer: document.getElementById('resultContainer'),
     audioPlayer: document.getElementById('audioPlayer'),
     speedRange: document.getElementById('speedRange'),
+    speedDecBtn: document.getElementById('speedDecBtn'),
+    speedIncBtn: document.getElementById('speedIncBtn'),
     speedValueText: document.getElementById('speedValueText'),
     presetSpeedBtns: document.querySelectorAll('.c-btn--preset'),
     downloadBtn: document.getElementById('downloadBtn'),
@@ -269,10 +271,22 @@
     // ダウンロードボタン押下
     elements.downloadBtn.addEventListener('click', handleDownload);
 
-    // 再生速度スライダー
+    // 再生速度スライダー (0.1刻み)
     if (elements.speedRange) {
       elements.speedRange.addEventListener('input', (e) => {
         setPlaybackRate(e.target.value);
+      });
+    }
+
+    // 再生速度微調整ボタン (-0.1 / +0.1)
+    if (elements.speedDecBtn) {
+      elements.speedDecBtn.addEventListener('click', () => {
+        setPlaybackRate(currentPlaybackRate - 0.1);
+      });
+    }
+    if (elements.speedIncBtn) {
+      elements.speedIncBtn.addEventListener('click', () => {
+        setPlaybackRate(currentPlaybackRate + 0.1);
       });
     }
 
@@ -293,25 +307,29 @@
   }
 
   /**
-   * 音声の再生速度を設定（ブラウザのローカル処理・トークン消費なし）
+   * 音声の再生速度を設定（ブラウザのローカル処理・トークン消費なし、0.1刻みで丸め）
    */
   function setPlaybackRate(rate) {
-    const num = Math.min(2.0, Math.max(0.5, parseFloat(rate) || 1.0));
+    let num = parseFloat(rate) || 1.0;
+    // 0.1刻みで四捨五入して丸める (浮動小数点数誤差防止)
+    num = Math.round(num * 10) / 10;
+    num = Math.min(2.0, Math.max(0.5, num));
     currentPlaybackRate = num;
+
     if (elements.audioPlayer) {
       elements.audioPlayer.playbackRate = num;
     }
     if (elements.speedRange) {
-      elements.speedRange.value = num;
+      elements.speedRange.value = num.toFixed(1);
     }
     if (elements.speedValueText) {
-      elements.speedValueText.textContent = `${num.toFixed(num % 1 === 0 ? 1 : 2)}x`;
+      elements.speedValueText.textContent = `${num.toFixed(1)}x`;
     }
 
     // プリセットボタンのアクティブ表示切替
     elements.presetSpeedBtns.forEach(btn => {
       const btnSpeed = parseFloat(btn.dataset.speed);
-      if (Math.abs(btnSpeed - num) < 0.01) {
+      if (Math.abs(btnSpeed - num) < 0.05) {
         btn.classList.add('c-btn--preset-active');
       } else {
         btn.classList.remove('c-btn--preset-active');

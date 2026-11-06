@@ -24,7 +24,7 @@
         <span class="c-logo__badge">Gemini TTS</span>
       </div>
       <div class="c-version">
-        <span class="c-version__text">Ver: 2026.10.18 14:15</span>
+        <span class="c-version__text">Ver: 2026.11.06 10:55</span>
       </div>
     </div>
   </header>
@@ -179,24 +179,28 @@
                 <div class="p-speed-control__header">
                   <span class="p-speed-control__label">再生速度:</span>
                   <span id="speedValueText" class="p-speed-control__val">1.0x</span>
-                  <span class="p-speed-control__note">※速度変更はローカル処理のためトークン消費ゼロ</span>
+                  <span class="p-speed-control__note">※0.1刻みで調整可能・トークン消費ゼロ</span>
                 </div>
                 <div class="p-speed-control__body">
-                  <input
-                    type="range"
-                    id="speedRange"
-                    class="p-speed-control__range"
-                    min="0.5"
-                    max="2.0"
-                    step="0.05"
-                    value="1.0"
-                    title="スライダーで再生速度を微調整 (0.5x〜2.0x)"
-                  >
+                  <div class="p-speed-control__slider-row">
+                    <button type="button" id="speedDecBtn" class="c-btn c-btn--step" title="速度を0.1下げる">-0.1</button>
+                    <input
+                      type="range"
+                      id="speedRange"
+                      class="p-speed-control__range"
+                      min="0.5"
+                      max="2.0"
+                      step="0.1"
+                      value="1.0"
+                      title="スライダーで再生速度を0.1刻みで調整 (0.5x〜2.0x)"
+                    >
+                    <button type="button" id="speedIncBtn" class="c-btn c-btn--step" title="速度を0.1上げる">+0.1</button>
+                  </div>
                   <div class="p-speed-control__presets">
                     <button type="button" class="c-btn c-btn--preset" data-speed="0.5">0.5x</button>
-                    <button type="button" class="c-btn c-btn--preset" data-speed="0.75">0.75x</button>
+                    <button type="button" class="c-btn c-btn--preset" data-speed="0.8">0.8x</button>
                     <button type="button" class="c-btn c-btn--preset c-btn--preset-active" data-speed="1.0">1.0x</button>
-                    <button type="button" class="c-btn c-btn--preset" data-speed="1.25">1.25x</button>
+                    <button type="button" class="c-btn c-btn--preset" data-speed="1.2">1.2x</button>
                     <button type="button" class="c-btn c-btn--preset" data-speed="1.5">1.5x</button>
                     <button type="button" class="c-btn c-btn--preset" data-speed="2.0">2.0x</button>
                   </div>
@@ -225,7 +229,7 @@
   <footer class="l-footer">
     <div class="l-footer__inner">
       <p>台湾華語 リスニング＆スピーキング学習 Webアプリ（ブラウザ内完全処理）</p>
-      <p style="font-size: 11px; margin-top: 4px; color: #94a3b8;">バージョン: 2026.10.18 14:15 更新版</p>
+      <p style="font-size: 11px; margin-top: 4px; color: #94a3b8;">バージョン: 2026.11.06 10:55 更新版</p>
     </div>
   </footer>
 

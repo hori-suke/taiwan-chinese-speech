@@ -186,6 +186,24 @@ body {
   }
 }
 
+.c-btn--step {
+  background-color: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 6px;
+  line-height: 1;
+  min-width: 38px;
+  @media (hover: hover) {
+    &:hover {
+      background-color: #e2e8f0;
+      border-color: #94a3b8;
+    }
+  }
+}
+
 .c-btn--preset {
   background-color: #ffffff;
   color: #334155;
@@ -503,9 +521,17 @@ body {
   flex-wrap: wrap;
 }
 
+.p-speed-control__slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+
 .p-speed-control__range {
   flex: 1;
-  min-width: 140px;
+  min-width: 120px;
   accent-color: #10b981;
   cursor: pointer;
 }
